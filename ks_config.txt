@@ -14,7 +14,9 @@ timezone Asia/Seoul
 #Root password
 rootpw --iscrypted $1$AcGN5p1x$WIfYNc49ykRLpFVoE6EA31
 #Initial user
-user cacti --fullname "cacti" --iscrypted --password $1$AcGN5p1x$WIfYNc49ykRLpFVoE6EA31
+preseed passwd/user-fullname string cacti
+preseed passwd/username string cacti
+preseed passwd/user-password-crypted password $1$AcGN5p1x$WIfYNc49ykRLpFVoE6EA31
 #Reboot after installation
 reboot
 #Use text mode install
@@ -22,7 +24,7 @@ text
 #Install OS instead of upgrade
 install
 #Use CDROM installation media
-cdrom
+#cdrom
 #System bootloader configuration
 bootloader --location=mbr 
 #Clear the Master Boot Record
@@ -30,8 +32,30 @@ zerombr yes
 #Partition clearing information
 clearpart --all --initlabel 
 #Disk partitioning information
-part / --fstype ext4 --size 1 --grow --asprimary 
-part swap --recommended 
+# 가장 간단한 설정
+#part / --fstype ext4 --size 1 --grow --asprimary 
+#part swap --recommended 
+
+# 15/04/30 - 테스트중
+part /boot --fstype=ext4 --size=200 --onpart=/dev/sda --asprimary
+part / --fstype=ext4 --size=4000 --onpart=/dev/sda --asprimary
+part /home --fstype=ext4 --size=1 --grow --onpart=/dev/sda
+part swap --size=1024 --onpart=/dev/sda
+#part swap --fstype swap --noformat --size 1024 --onpart /dev/sda
+
+
+# sample 
+#bootloader --location=mbr --driveorder=cciss/c0d0,cciss/c0d1
+#clearpart --linux
+#part /boot --fstype ext3 --onpart cciss/c0d0p1
+#part swap --noformat --onpart cciss/c0d0p7
+#part /usr --fstype ext3 --onpart cciss/c0d0p2
+#part / --fstype ext3 --onpart cciss/c0d0p3
+#part /var/lib --fstype ext3 --onpart cciss/c0d0p5
+#part /var --fstype ext3 --onpart cciss/c0d0p6
+#part /tmp --fstype ext3 --onpart cciss/c0d0p8
+#part /data --fstype ext3 --onpart cciss/c0d0p9
+
 #System authorization infomation
 auth  --useshadow  --enablemd5 
 #Network information
@@ -41,3 +65,51 @@ network --bootproto=static --ip=192.168.101.19 --netmask=255.255.255.0 --gateway
 firewall --disabled 
 #Do not configure the X Window System
 skipx
+
+
+########################################################
+# preseed setting
+########################################################
+
+# mirror site
+preseed mirror/country string manual
+preseed mirror/http/hostname string ftp.daum.net
+preseed mirror/http/directory string /ubuntu
+preseed mirror/http/proxy string
+
+preseed pkgsel/language-packs multiselect ko_KR.UTF-8,en_US.UTF-8
+preseed pkgsel/update-policy select none
+preseed popularity-contest popularity-contest/participate boolean false
+preseed grub-installer/only_debian boolean true
+preseed grub-installer/with_other_os boolean true
+
+########################################################
+
+%packages
+openssh-server
+build-essential
+autoconf
+vim-nox
+rsync
+ntp
+
+%post
+#apt-get update
+#apt-get -y install openssh-server build-essential gpm vim rsync
+echo "%sudo   ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; sync;
+
+cat << EOF > /etc/ntp.conf
+server 1.kr.pool.ntp.org
+server 0.asia.pool.ntp.org
+server 2.asia.pool.ntp.org
+EOF
+update-rc.d ntp defaults
+update-rc.d ssh defaults
+
+# Clean up 
+rm -f /etc/ssh/ssh_host_*
+rm -f /var/cache/apt/archives/*.deb
+rm -f /var/cache/apt/*cache.bin
+rm -f /var/lib/apt/lists/*_Packages
+touch /root/postinst.done
+%end
